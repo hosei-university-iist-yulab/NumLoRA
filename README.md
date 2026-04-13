@@ -178,6 +178,10 @@ Computational resources provided by [Hosei University](https://www.hosei.ac.jp/)
 
 ## Contact
 
+<a href="https://github.com/mesabo">
+  <img src="https://github.com/mesabo.png" width="60" style="border-radius:50%">
+</a>
+
 **Franck Junior Aboya Messou** ([@mesabo](https://github.com/mesabo)) — franckjunioraboya.messou@ieee.org
 
 ## License
