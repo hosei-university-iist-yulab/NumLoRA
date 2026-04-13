@@ -1,18 +1,10 @@
 """
-NumLoRA — Results aggregation: LaTeX tables + figures from JSON results.
+NumLoRA — Results aggregation: LaTeX tables + publication-quality figures.
 
 Usage:
     python scripts/analysis/generate_tables.py [--results-dir results/full]
 
-Outputs:
-    paper/tables/table_main.tex        — Main comparison (LoRA vs CTGS-only vs NumLoRA per backbone)
-    paper/tables/table_mr_sweep.tex    — MR sensitivity (0.1-0.5) per dataset
-    paper/tables/table_ablation.tex    — Component ablation (7 subsets)
-    paper/tables/table_backbone.tex    — Backbone scale comparison
-    paper/figures/fig_mr_curves.pdf    — MAE vs MR curves
-    paper/figures/fig_ablation_bars.pdf — Ablation bar chart
-    paper/figures/fig_variance_hist.pdf — Activation variance: text vs numerical
-    paper/figures/fig_radar.pdf        — Radar chart across datasets
+Style: matches topic4-multi-area-scaling conventions (bold, serif, 600 dpi).
 """
 
 import argparse
@@ -25,22 +17,75 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
+# ═══════════════════════════════════════════════════════════════
+# PUBLICATION STYLE (matching topic4-multi-area-scaling)
+# ═══════════════════════════════════════════════════════════════
 
-# ── Styling ──
 plt.rcParams.update({
-    "font.size": 11,
     "font.family": "serif",
-    "axes.labelsize": 12,
-    "axes.titlesize": 13,
-    "legend.fontsize": 9,
-    "xtick.labelsize": 10,
-    "ytick.labelsize": 10,
-    "figure.dpi": 150,
+    "font.serif": ["Times New Roman", "DejaVu Serif"],
+    "font.size": 14,
+    "font.weight": "bold",
+    "text.color": "black",
+    "axes.labelsize": 15,
+    "axes.titlesize": 16,
+    "axes.labelweight": "bold",
+    "axes.titleweight": "bold",
+    "axes.labelcolor": "black",
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+    "xtick.color": "black",
+    "ytick.color": "black",
+    "legend.fontsize": 11,
+    "figure.dpi": 600,
+    "savefig.dpi": 600,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.05,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "grid.linewidth": 0.5,
+    "lines.linewidth": 2.5,
+    "axes.linewidth": 1.2,
+    "xtick.major.width": 1.0,
+    "ytick.major.width": 1.0,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
 })
+
+_orig_savefig = plt.savefig
+
+
+def _savefig_bold(*args, **kwargs):
+    kwargs.setdefault("dpi", 600)
+    kwargs.setdefault("bbox_inches", "tight")
+    kwargs.setdefault("pad_inches", 0.05)
+    fig = plt.gcf()
+    for ax in fig.get_axes():
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontweight("bold")
+            label.set_color("black")
+        ax.title.set_color("black")
+        ax.title.set_fontweight("bold")
+        ax.xaxis.label.set_color("black")
+        ax.xaxis.label.set_fontweight("bold")
+        ax.yaxis.label.set_color("black")
+        ax.yaxis.label.set_fontweight("bold")
+        for txt in ax.texts:
+            txt.set_fontweight("bold")
+            txt.set_color("black")
+        if hasattr(ax, 'legend_') and ax.legend_:
+            for t in ax.legend_.get_texts():
+                t.set_fontweight("bold")
+    if fig._suptitle:
+        fig._suptitle.set_color("black")
+        fig._suptitle.set_fontweight("bold")
+    return _orig_savefig(*args, **kwargs)
+
+
+plt.savefig = _savefig_bold
 
 DATASET_LABELS = {
     "ett_h1": "ETT-h1", "ett_h2": "ETT-h2", "ett_m1": "ETT-m1", "ett_m2": "ETT-m2",
@@ -52,20 +97,19 @@ BACKBONE_LABELS = {
 }
 METHOD_LABELS = {
     "lora_r8": "LoRA", "numlora_full": "NumLoRA", "numlora_ctgs_only": "CTGS-only",
-    "dora_r8": "DoRA", "numlora_mai_only": "MAI-only", "numlora_ssr_only": "SSR-only",
-    "numlora_mai_ssr": "MAI+SSR", "numlora_mai_ctgs": "MAI+CTGS",
-    "numlora_ssr_ctgs": "SSR+CTGS",
+    "dora_r8": "DoRA",
 }
 COLORS = {
-    "LoRA": "#1f77b4", "NumLoRA": "#d62728", "CTGS-only": "#2ca02c",
-    "DoRA": "#9467bd", "MAI-only": "#ff7f0e", "SSR-only": "#8c564b",
-    "MAI+SSR": "#e377c2", "MAI+CTGS": "#7f7f7f", "SSR+CTGS": "#bcbd22",
+    "LoRA": "#1f77b4", "NumLoRA": "#d62728", "CTGS-only": "#2ca02c", "DoRA": "#9467bd",
+}
+MARKERS = {
+    "LoRA": "o", "NumLoRA": "s", "CTGS-only": "D", "DoRA": "^",
 }
 
 
 def load_results(results_dir):
-    """Load all JSON results into nested dict: results[backbone][dataset][method][mr] = [mae_values]"""
     results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
+    meta = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
 
     for pattern in [f"{results_dir}/*.json", f"{results_dir}/ablation/*.json"]:
         for f in sorted(glob.glob(pattern)):
@@ -75,154 +119,169 @@ def load_results(results_dir):
                 continue
             bb = r.get("backbone", "smollm_360m")
             results[bb][r["dataset"]][r["method"]][r["missing_rate"]].append(r["test_mae"])
-
-    return results
-
-
-def fmt_val(vals, bold=False, underline=False):
-    """Format mean±std for LaTeX."""
-    if not vals:
-        return "--"
-    m, s = np.mean(vals), np.std(vals)
-    core = f"{m:.4f}"
-    if len(vals) > 1:
-        core += f"$\\pm${s:.3f}"
-    if bold:
-        core = f"\\textbf{{{core}}}"
-    if underline:
-        core = f"\\underline{{{core}}}"
-    return core
+            meta[bb][r["dataset"]][r["method"]][r["missing_rate"]] = {
+                "elapsed": r.get("elapsed_seconds", 0),
+                "params": r.get("trainable_params", 0),
+                "pct": r.get("trainable_pct", 0),
+            }
+    return results, meta
 
 
 # ═══════════════════════════════════════════════════════════════
 # TABLES
 # ═══════════════════════════════════════════════════════════════
 
+def fmt_val(vals, bold=False):
+    if not vals:
+        return "--"
+    m, s = np.mean(vals), np.std(vals)
+    core = f"{m:.4f}" if len(vals) == 1 else f"{m:.3f}$\\pm${s:.3f}"
+    if bold:
+        core = f"\\textbf{{{core}}}"
+    return core
+
+
 def generate_main_table(results, out_path, backbone="smollm_360m", mr=0.3):
-    """Table 1: Main comparison at MR=0.3 for a given backbone."""
     datasets = [d for d in DATASET_LABELS if results[backbone].get(d)]
     methods = ["lora_r8", "numlora_ctgs_only", "numlora_full"]
 
-    lines = []
-    lines.append("\\begin{table}[t]")
-    lines.append(f"\\caption{{Main results (MAE $\\downarrow$) at MR={mr} on {BACKBONE_LABELS.get(backbone, backbone)}. "
-                 "Best in \\textbf{bold}.}")
-    lines.append(f"\\label{{tab:main_{backbone}}}")
-    lines.append("\\centering\\small")
-    cols = "l" + "c" * len(datasets)
-    lines.append(f"\\begin{{tabular}}{{@{{}}{cols}@{{}}}}")
-    lines.append("\\toprule")
-    header = "Method & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " \\\\"
-    lines.append(header)
-    lines.append("\\midrule")
+    lines = [
+        "\\begin{table}[t]",
+        f"\\caption{{Main results (MAE $\\downarrow$) at MR={mr} on {BACKBONE_LABELS.get(backbone, backbone)}.}}",
+        f"\\label{{tab:main_{backbone}}}",
+        "\\centering\\small",
+        f"\\begin{{tabular}}{{@{{}}l{'c' * len(datasets)}@{{}}}}",
+        "\\toprule",
+        "Method & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " \\\\",
+        "\\midrule",
+    ]
 
     for method in methods:
-        vals_per_ds = []
-        for ds in datasets:
-            v = results[backbone][ds].get(method, {}).get(mr, [])
-            vals_per_ds.append(v)
-
-        # Find best (lowest MAE)
+        vals_per_ds = [results[backbone][ds].get(method, {}).get(mr, []) for ds in datasets]
         means = [np.mean(v) if v else float("inf") for v in vals_per_ds]
         best_idx = np.argmin(means)
-
-        row_parts = [METHOD_LABELS.get(method, method)]
+        row = [METHOD_LABELS.get(method, method)]
         for i, v in enumerate(vals_per_ds):
-            row_parts.append(fmt_val(v, bold=(i == best_idx and len(v) > 0)))
-        lines.append(" & ".join(row_parts) + " \\\\")
+            row.append(fmt_val(v, bold=(i == best_idx and len(v) > 0)))
+        lines.append(" & ".join(row) + " \\\\")
 
-    lines.append("\\bottomrule")
-    lines.append("\\end{tabular}")
-    lines.append("\\end{table}")
-
+    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
     with open(out_path, "w") as f:
         f.write("\n".join(lines))
     print(f"  Written: {out_path}")
 
 
 def generate_ablation_table(results, out_path, backbone="smollm_360m", mr=0.3):
-    """Table 3: Component ablation."""
     datasets = ["ett_h1", "exchange", "weather"]
     methods = [
-        "lora_r8", "numlora_mai_only", "numlora_ssr_only", "numlora_ctgs_only",
-        "numlora_mai_ssr", "numlora_mai_ctgs", "numlora_ssr_ctgs", "numlora_full",
+        "lora_r8", "numlora_ctgs_only", "numlora_mai_only", "numlora_ssr_only",
+        "numlora_mai_ctgs", "numlora_mai_ssr", "numlora_ssr_ctgs", "numlora_full",
+    ]
+    labels = ["LoRA", "CTGS only", "MAI only", "SSR only",
+              "MAI+CTGS", "MAI+SSR", "SSR+CTGS", "All three"]
+
+    lines = [
+        "\\begin{table}[t]",
+        f"\\caption{{Component ablation (MAE $\\downarrow$) at MR={mr} on {BACKBONE_LABELS.get(backbone, backbone)}.}}",
+        f"\\label{{tab:ablation_{backbone}}}",
+        "\\centering\\small",
+        "\\begin{tabular}{@{}lcccc@{}}",
+        "\\toprule",
+        "Variant & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " & vs LoRA \\\\",
+        "\\midrule",
     ]
 
-    lines = []
-    lines.append("\\begin{table}[t]")
-    lines.append(f"\\caption{{Component ablation (MAE $\\downarrow$) at MR={mr} on {BACKBONE_LABELS.get(backbone, backbone)}.}}")
-    lines.append(f"\\label{{tab:ablation_{backbone}}}")
-    lines.append("\\centering\\small")
-    lines.append("\\begin{tabular}{@{}lccc@{}}")
-    lines.append("\\toprule")
-    lines.append("Variant & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " \\\\")
-    lines.append("\\midrule")
+    lora_means = {}
+    for ds in datasets:
+        v = results[backbone][ds].get("lora_r8", {}).get(mr, [])
+        lora_means[ds] = np.mean(v) if v else float("inf")
+    lora_avg = np.mean(list(lora_means.values()))
 
-    for method in methods:
-        row = [METHOD_LABELS.get(method, method)]
+    for method, label in zip(methods, labels):
+        row = [label]
+        method_means = []
         for ds in datasets:
             v = results[backbone][ds].get(method, {}).get(mr, [])
             row.append(fmt_val(v))
+            if v:
+                method_means.append(np.mean(v))
+        avg = np.mean(method_means) if method_means else float("inf")
+        if method == "lora_r8":
+            row.append("--")
+        else:
+            imp = (lora_avg - avg) / lora_avg * 100
+            row.append(f"+{imp:.1f}\\%")
         lines.append(" & ".join(row) + " \\\\")
 
-    lines.append("\\bottomrule")
-    lines.append("\\end{tabular}")
-    lines.append("\\end{table}")
-
+    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
     with open(out_path, "w") as f:
         f.write("\n".join(lines))
     print(f"  Written: {out_path}")
 
 
 def generate_backbone_table(results, out_path, mr=0.3):
-    """Table: Cross-backbone comparison (LoRA vs CTGS-only vs NumLoRA-full)."""
     backbones = [b for b in BACKBONE_LABELS if any(results[b])]
     datasets = ["ett_h1", "weather", "exchange", "traffic", "ili"]
     methods = ["lora_r8", "numlora_ctgs_only", "numlora_full"]
 
-    lines = []
-    lines.append("\\begin{table}[t]")
-    lines.append(f"\\caption{{Cross-backbone comparison (MAE $\\downarrow$) at MR={mr}. "
-                 "Wins = cells where method beats LoRA.}}")
-    lines.append("\\label{tab:backbone}")
-    lines.append("\\centering\\small")
-    lines.append("\\begin{tabular}{@{}ll" + "c" * len(datasets) + "c@{}}")
-    lines.append("\\toprule")
-    lines.append("Backbone & Method & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " & Wins \\\\")
-    lines.append("\\midrule")
+    lines = [
+        "\\begin{table}[t]",
+        f"\\caption{{Cross-backbone comparison (MAE $\\downarrow$) at MR={mr}.}}",
+        "\\label{tab:backbone}",
+        "\\centering\\small",
+        f"\\begin{{tabular}}{{@{{}}ll{'c' * len(datasets)}c@{{}}}}",
+        "\\toprule",
+        "Backbone & Method & " + " & ".join(DATASET_LABELS.get(d, d) for d in datasets) + " & Wins \\\\",
+        "\\midrule",
+    ]
 
     for bb in backbones:
+        lora_means = {}
+        for ds in datasets:
+            lv = results[bb][ds].get("lora_r8", {}).get(mr, [])
+            lora_means[ds] = np.mean(lv) if lv else float("inf")
+
         for mi, method in enumerate(methods):
-            row = []
-            if mi == 0:
-                row.append(f"\\multirow{{3}}{{*}}{{{BACKBONE_LABELS[bb]}}}")
-            else:
-                row.append("")
-            row.append(METHOD_LABELS.get(method, method))
-
+            row = [BACKBONE_LABELS[bb] if mi == 0 else "", METHOD_LABELS.get(method, method)]
             wins = 0
-            lora_means = {}
-            for ds in datasets:
-                lv = results[bb][ds].get("lora_r8", {}).get(mr, [])
-                lora_means[ds] = np.mean(lv) if lv else float("inf")
-
             for ds in datasets:
                 v = results[bb][ds].get(method, {}).get(mr, [])
                 m = np.mean(v) if v else float("inf")
                 if method != "lora_r8" and m < lora_means[ds]:
                     wins += 1
                 row.append(fmt_val(v))
-
             row.append(f"{wins}/{len(datasets)}" if method != "lora_r8" else "--")
             lines.append(" & ".join(row) + " \\\\")
-
         lines.append("\\midrule")
 
-    # Remove last \midrule and replace with \bottomrule
     lines[-1] = "\\bottomrule"
-    lines.append("\\end{tabular}")
-    lines.append("\\end{table}")
+    lines += ["\\end{tabular}", "\\end{table}"]
+    with open(out_path, "w") as f:
+        f.write("\n".join(lines))
+    print(f"  Written: {out_path}")
 
+
+def generate_efficiency_table(results, meta, out_path):
+    """Appendix: training time, parameters, memory per method."""
+    lines = [
+        "\\begin{table}[t]",
+        "\\caption{Efficiency comparison on SmolLM-360M (ETT-h1, MR=0.3).}",
+        "\\label{tab:efficiency}",
+        "\\centering\\small",
+        "\\begin{tabular}{@{}lccc@{}}",
+        "\\toprule",
+        "Method & Trainable Params & Param \\% & Train Time (s) \\\\",
+        "\\midrule",
+    ]
+
+    for method in ["lora_r8", "numlora_ctgs_only", "numlora_full"]:
+        m = meta["smollm_360m"]["ett_h1"].get(method, {}).get(0.3, {})
+        params = m.get("params", 0)
+        pct = m.get("pct", 0)
+        elapsed = m.get("elapsed", 0)
+        lines.append(f"{METHOD_LABELS.get(method, method)} & {params:,} & {pct:.2f}\\% & {elapsed:.0f} \\\\")
+
+    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
     with open(out_path, "w") as f:
         f.write("\n".join(lines))
     print(f"  Written: {out_path}")
@@ -233,13 +292,13 @@ def generate_backbone_table(results, out_path, mr=0.3):
 # ═══════════════════════════════════════════════════════════════
 
 def generate_mr_curves(results, out_path, backbone="smollm_360m"):
-    """Fig: MAE vs missing rate curves per dataset."""
+    """MAE vs missing rate curves per dataset — publication quality."""
     datasets = [d for d in ["ett_h1", "weather", "exchange", "traffic", "ili"] if results[backbone].get(d)]
-    methods = ["lora_r8", "numlora_ctgs_only", "numlora_full"]
+    methods = ["lora_r8", "numlora_full"]
     mrs = [0.1, 0.2, 0.3, 0.4, 0.5]
 
     n_ds = len(datasets)
-    fig, axes = plt.subplots(1, n_ds, figsize=(3.2 * n_ds, 3), sharey=False)
+    fig, axes = plt.subplots(1, n_ds, figsize=(3.5 * n_ds, 3.5), sharey=False)
     if n_ds == 1:
         axes = [axes]
 
@@ -256,78 +315,43 @@ def generate_mr_curves(results, out_path, backbone="smollm_360m"):
 
             if means:
                 color = COLORS.get(label, "#333333")
-                ax.plot(valid_mrs, means, "-o", label=label, color=color, markersize=4, linewidth=1.5)
+                marker = MARKERS.get(label, "o")
+                ax.plot(valid_mrs, means, f"-{marker}", label=label, color=color,
+                        markersize=7, linewidth=2.5, markeredgecolor="white", markeredgewidth=1.0)
                 ax.fill_between(valid_mrs,
                                 np.array(means) - np.array(stds),
                                 np.array(means) + np.array(stds),
                                 alpha=0.15, color=color)
 
-        ax.set_title(DATASET_LABELS.get(ds, ds))
-        ax.set_xlabel("Missing Rate")
+        ax.set_title(DATASET_LABELS.get(ds, ds), fontsize=16, fontweight="bold")
+        ax.set_xlabel("Missing Rate", fontsize=14, fontweight="bold")
         if ax == axes[0]:
-            ax.set_ylabel("MAE ↓")
-        ax.grid(True, alpha=0.3)
+            ax.set_ylabel(r"MAE $\downarrow$", fontsize=14, fontweight="bold")
+        ax.set_xticks([0.1, 0.2, 0.3, 0.4, 0.5])
 
-    axes[-1].legend(loc="upper left", framealpha=0.9)
-    fig.suptitle(f"MAE vs Missing Rate ({BACKBONE_LABELS.get(backbone, backbone)})", fontsize=13, y=1.02)
+    axes[-1].legend(loc="upper left", framealpha=0.95, edgecolor="black",
+                    fontsize=12, fancybox=False)
+    bb_label = BACKBONE_LABELS.get(backbone, backbone)
+    fig.suptitle(f"MAE vs Missing Rate ({bb_label})", fontsize=18, fontweight="bold", y=1.03)
     plt.tight_layout()
     fig.savefig(out_path)
     plt.close()
     print(f"  Written: {out_path}")
 
 
-def generate_ablation_bars(results, out_path, backbone="smollm_360m", mr=0.3):
-    """Fig: Ablation bar chart — improvement over LoRA per component variant."""
-    datasets = ["ett_h1", "exchange", "weather"]
-    methods = [
-        "numlora_mai_only", "numlora_ssr_only", "numlora_ctgs_only",
-        "numlora_mai_ssr", "numlora_mai_ctgs", "numlora_ssr_ctgs", "numlora_full",
-    ]
-    labels = ["MAI", "SSR", "CTGS", "MAI+SSR", "MAI+CTGS", "SSR+CTGS", "All 3"]
-
-    # Compute improvement over LoRA (avg across datasets)
-    improvements = []
-    for method in methods:
-        imp_per_ds = []
-        for ds in datasets:
-            lv = results[backbone][ds].get("lora_r8", {}).get(mr, [])
-            nv = results[backbone][ds].get(method, {}).get(mr, [])
-            if lv and nv:
-                imp_per_ds.append((np.mean(lv) - np.mean(nv)) / np.mean(lv) * 100)
-        improvements.append(np.mean(imp_per_ds) if imp_per_ds else 0)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    colors_list = ["#ff7f0e", "#8c564b", "#2ca02c", "#e377c2", "#7f7f7f", "#bcbd22", "#d62728"]
-    bars = ax.bar(labels, improvements, color=colors_list, edgecolor="white", linewidth=0.5)
-
-    ax.axhline(y=0, color="black", linewidth=0.8)
-    ax.set_ylabel("Improvement over LoRA (%)")
-    ax.set_title(f"Component Ablation at MR={mr} ({BACKBONE_LABELS.get(backbone, backbone)})")
-    ax.grid(axis="y", alpha=0.3)
-
-    for bar, val in zip(bars, improvements):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
-                f"{val:+.1f}%", ha="center", va="bottom", fontsize=9)
-
-    plt.tight_layout()
-    fig.savefig(out_path)
-    plt.close()
-    print(f"  Written: {out_path}")
-
-
-def generate_backbone_radar(results, out_path, mr=0.3):
-    """Fig: Radar chart comparing methods across datasets for each backbone."""
+def generate_radar(results, out_path, mr=0.3):
+    """Radar chart comparing LoRA vs NumLoRA across datasets for each backbone."""
     backbones = [b for b in BACKBONE_LABELS if any(results[b])]
     datasets = ["ett_h1", "weather", "exchange", "traffic", "ili"]
-    methods = ["lora_r8", "numlora_ctgs_only"]
+    methods = ["lora_r8", "numlora_full"]
 
     n_bb = len(backbones)
-    fig, axes = plt.subplots(1, n_bb, figsize=(4 * n_bb, 4), subplot_kw=dict(polar=True))
+    fig, axes = plt.subplots(1, n_bb, figsize=(4.5 * n_bb, 4.5), subplot_kw=dict(polar=True))
     if n_bb == 1:
         axes = [axes]
 
     angles = np.linspace(0, 2 * np.pi, len(datasets), endpoint=False).tolist()
-    angles += angles[:1]  # close the polygon
+    angles += angles[:1]
 
     for ax, bb in zip(axes, backbones):
         for method in methods:
@@ -339,57 +363,109 @@ def generate_backbone_radar(results, out_path, mr=0.3):
             vals += vals[:1]
 
             color = COLORS.get(label, "#333333")
-            ax.plot(angles, vals, "-o", label=label, color=color, linewidth=1.5, markersize=4)
-            ax.fill(angles, vals, alpha=0.1, color=color)
+            ax.plot(angles, vals, "-o", label=label, color=color,
+                    linewidth=2.5, markersize=6, markeredgecolor="white", markeredgewidth=1.0)
+            ax.fill(angles, vals, alpha=0.12, color=color)
 
         ax.set_xticks(angles[:-1])
-        ax.set_xticklabels([DATASET_LABELS.get(d, d) for d in datasets], fontsize=8)
-        ax.set_title(BACKBONE_LABELS[bb], pad=15)
-        ax.legend(loc="upper right", fontsize=7)
+        ax.set_xticklabels([DATASET_LABELS.get(d, d) for d in datasets],
+                           fontsize=11, fontweight="bold")
+        ax.set_title(BACKBONE_LABELS[bb], pad=20, fontsize=15, fontweight="bold")
+        ax.legend(loc="upper right", fontsize=10, framealpha=0.95, edgecolor="black", fancybox=False)
+        ax.tick_params(axis="y", labelsize=9)
 
-    fig.suptitle(f"MAE at MR={mr} (lower = better)", fontsize=13, y=1.05)
+    fig.suptitle(f"MAE at MR={mr} (lower = better)", fontsize=18, fontweight="bold", y=1.06)
     plt.tight_layout()
     fig.savefig(out_path)
     plt.close()
     print(f"  Written: {out_path}")
 
 
-def generate_improvement_heatmap(results, out_path, method="numlora_ctgs_only"):
-    """Fig: Heatmap of improvement (%) over LoRA across backbones x datasets at MR=0.3."""
-    backbones = [b for b in BACKBONE_LABELS if any(results[b])]
-    datasets = ["ett_h1", "weather", "exchange", "traffic", "ili"]
+def generate_ablation_bars(results, out_path, backbone="smollm_360m", mr=0.3):
+    """Ablation bar chart — improvement over LoRA per component variant."""
+    datasets = ["ett_h1", "exchange", "weather"]
+    methods = [
+        "numlora_ctgs_only", "numlora_mai_only", "numlora_ssr_only",
+        "numlora_mai_ctgs", "numlora_mai_ssr", "numlora_ssr_ctgs", "numlora_full",
+    ]
+    labels = ["CTGS", "MAI", "SSR", "MAI+\nCTGS", "MAI+\nSSR", "SSR+\nCTGS", "All 3"]
+
+    lora_means = {}
+    for ds in datasets:
+        v = results[backbone][ds].get("lora_r8", {}).get(mr, [])
+        lora_means[ds] = np.mean(v) if v else float("inf")
+    lora_avg = np.mean(list(lora_means.values()))
+
+    improvements = []
+    for method in methods:
+        imp_per_ds = []
+        for ds in datasets:
+            v = results[backbone][ds].get(method, {}).get(mr, [])
+            if v:
+                imp_per_ds.append((lora_means[ds] - np.mean(v)) / lora_means[ds] * 100)
+        improvements.append(np.mean(imp_per_ds) if imp_per_ds else 0)
+
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    colors_list = ["#2ca02c", "#ff7f0e", "#8c564b", "#7f7f7f", "#e377c2", "#bcbd22", "#d62728"]
+    bars = ax.bar(labels, improvements, color=colors_list, edgecolor="black", linewidth=0.8, width=0.65)
+
+    ax.axhline(y=0, color="black", linewidth=1.0)
+    ax.set_ylabel("Improvement over LoRA (%)", fontsize=15, fontweight="bold")
+    ax.set_title(f"Component Ablation at MR={mr} ({BACKBONE_LABELS.get(backbone, backbone)})",
+                 fontsize=16, fontweight="bold")
+
+    for bar, val in zip(bars, improvements):
+        y_pos = bar.get_height() + 0.3 if bar.get_height() >= 0 else bar.get_height() - 0.8
+        ax.text(bar.get_x() + bar.get_width() / 2, y_pos,
+                f"{val:+.1f}%", ha="center", va="bottom", fontsize=12, fontweight="bold")
+
+    plt.tight_layout()
+    fig.savefig(out_path)
+    plt.close()
+    print(f"  Written: {out_path}")
+
+
+def generate_training_efficiency(results, meta, out_path, backbone="smollm_360m"):
+    """Appendix: training time and parameter count comparison."""
+    datasets = [d for d in ["ett_h1", "weather", "exchange", "traffic", "ili"] if results[backbone].get(d)]
+    methods = ["lora_r8", "numlora_ctgs_only", "numlora_full"]
     mr = 0.3
 
-    matrix = []
-    for bb in backbones:
-        row = []
+    # Collect elapsed times
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    x = np.arange(len(datasets))
+    width = 0.25
+
+    for i, method in enumerate(methods):
+        label = METHOD_LABELS.get(method, method)
+        times = []
+        params = []
         for ds in datasets:
-            lv = results[bb][ds].get("lora_r8", {}).get(mr, [])
-            nv = results[bb][ds].get(method, {}).get(mr, [])
-            if lv and nv:
-                imp = (np.mean(lv) - np.mean(nv)) / np.mean(lv) * 100
-            else:
-                imp = 0
-            row.append(imp)
-        matrix.append(row)
+            m = meta[backbone][ds].get(method, {}).get(mr, {})
+            times.append(m.get("elapsed", 0))
+            params.append(m.get("params", 0))
 
-    matrix = np.array(matrix)
-    fig, ax = plt.subplots(figsize=(7, 3.5))
-    im = ax.imshow(matrix, cmap="RdYlGn", aspect="auto", vmin=-30, vmax=30)
+        color = COLORS.get(label, "#333333")
+        ax1.bar(x + i * width, times, width, label=label, color=color,
+                edgecolor="black", linewidth=0.5)
+        ax2.bar(x + i * width, [p / 1000 for p in params], width, label=label,
+                color=color, edgecolor="black", linewidth=0.5)
 
-    ax.set_xticks(range(len(datasets)))
-    ax.set_xticklabels([DATASET_LABELS.get(d, d) for d in datasets])
-    ax.set_yticks(range(len(backbones)))
-    ax.set_yticklabels([BACKBONE_LABELS[b] for b in backbones])
+    ax1.set_ylabel("Training Time (s)", fontsize=14, fontweight="bold")
+    ax1.set_title("(a) Training Time", fontsize=15, fontweight="bold")
+    ax1.set_xticks(x + width)
+    ax1.set_xticklabels([DATASET_LABELS.get(d, d) for d in datasets], fontsize=11, fontweight="bold")
+    ax1.legend(fontsize=11, framealpha=0.95, edgecolor="black", fancybox=False)
 
-    for i in range(len(backbones)):
-        for j in range(len(datasets)):
-            val = matrix[i, j]
-            color = "white" if abs(val) > 15 else "black"
-            ax.text(j, i, f"{val:+.1f}%", ha="center", va="center", fontsize=9, color=color)
+    ax2.set_ylabel("Trainable Params (K)", fontsize=14, fontweight="bold")
+    ax2.set_title("(b) Parameter Count", fontsize=15, fontweight="bold")
+    ax2.set_xticks(x + width)
+    ax2.set_xticklabels([DATASET_LABELS.get(d, d) for d in datasets], fontsize=11, fontweight="bold")
+    ax2.legend(fontsize=11, framealpha=0.95, edgecolor="black", fancybox=False)
 
-    plt.colorbar(im, ax=ax, label="Improvement over LoRA (%)", shrink=0.8)
-    ax.set_title(f"{METHOD_LABELS.get(method, method)} vs LoRA at MR={mr}")
+    fig.suptitle(f"Efficiency ({BACKBONE_LABELS.get(backbone, backbone)}, MR={mr})",
+                 fontsize=17, fontweight="bold", y=1.03)
     plt.tight_layout()
     fig.savefig(out_path)
     plt.close()
@@ -409,7 +485,7 @@ def main():
     os.makedirs("paper/figures", exist_ok=True)
 
     print("Loading results...")
-    results = load_results(args.results_dir)
+    results, meta = load_results(args.results_dir)
 
     total = sum(
         len(v) for bb in results for ds in results[bb]
@@ -426,18 +502,23 @@ def main():
     if any(results["tinyllama_1.1b"]):
         generate_ablation_table(results, "paper/tables/table_ablation_tinyllama.tex", backbone="tinyllama_1.1b")
     generate_backbone_table(results, "paper/tables/table_backbone.tex")
+    generate_efficiency_table(results, meta, "paper/tables/table_efficiency.tex")
 
-    # ── Figures ──
-    print("\nGenerating figures...")
+    # ── Main paper figures ──
+    print("\nGenerating main paper figures...")
+    generate_radar(results, "paper/figures/fig_radar_backbones.pdf")
     for bb in BACKBONE_LABELS:
         if any(results[bb]):
             generate_mr_curves(results, f"paper/figures/fig_mr_curves_{bb}.pdf", backbone=bb)
+
+    # ── Appendix figures ──
+    print("\nGenerating appendix figures...")
     generate_ablation_bars(results, "paper/figures/fig_ablation_bars_smollm.pdf", backbone="smollm_360m")
     if any(results["tinyllama_1.1b"]):
         generate_ablation_bars(results, "paper/figures/fig_ablation_bars_tinyllama.pdf", backbone="tinyllama_1.1b")
-    generate_backbone_radar(results, "paper/figures/fig_radar_backbones.pdf")
-    generate_improvement_heatmap(results, "paper/figures/fig_heatmap_ctgs.pdf", method="numlora_ctgs_only")
-    generate_improvement_heatmap(results, "paper/figures/fig_heatmap_numlora.pdf", method="numlora_full")
+    for bb in BACKBONE_LABELS:
+        if any(results[bb]):
+            generate_training_efficiency(results, meta, f"paper/figures/fig_efficiency_{bb}.pdf", backbone=bb)
 
     print("\nDone! Tables in paper/tables/, figures in paper/figures/")
 

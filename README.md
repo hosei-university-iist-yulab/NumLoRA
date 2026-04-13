@@ -2,13 +2,13 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**NumLoRA** fixes a fundamental problem: LoRA was designed for text, but frozen LLMs are increasingly used for numerical tasks (time-series imputation, tabular regression, scientific computing). Text tokens produce sparse, bounded gradients through embedding lookups. Numerical patches produce dense gradients through continuous projections, whose magnitude scales with the input norm. This mismatch causes training instability and suboptimal adaptation.
+**LoRA was not made for numbers.** Its gradient flow is calibrated for text token embeddings, where each token is a sparse one-hot lookup producing bounded gradients. When frozen LLMs are repurposed for numerical tasks (time-series imputation, forecasting, classification), the continuous input projections produce dense gradients whose magnitude scales with the patch embedding norm, causing training instability.
 
-NumLoRA introduces **Continuous-Token Gradient Scaling (CTGS)**, a single learnable scalar per layer that normalises LoRA gradients by the input activation norm during the backward pass. CTGS adds just *L* parameters (e.g., 32 for a 32-layer model), incurs **zero inference overhead** (backward-pass only), and requires **no domain-specific priors**.
+**NumLoRA** introduces **Continuous-Token Gradient Scaling (CTGS)**: a single learnable scalar per layer that normalises LoRA gradients by the input activation norm during the backward pass. CTGS adds just *L* parameters (e.g., 32 for a 32-layer model), incurs **zero inference overhead**, and requires **no domain-specific priors**.
 
 ## Key Results
 
-On **SmolLM-360M** across 5 time-series benchmarks at 3 missing rates (15 conditions total):
+On **SmolLM-360M** across 5 time-series imputation benchmarks at 3 missing rates (15 conditions):
 
 | Dataset | MR=0.1 | MR=0.3 | MR=0.5 |
 |---------|--------|--------|--------|
@@ -18,30 +18,28 @@ On **SmolLM-360M** across 5 time-series benchmarks at 3 missing rates (15 condit
 | Traffic (transport) | **+19.4%** | **+16.4%** | **+12.7%** |
 | ILI (epidemiological) | **+14.0%** | **+12.2%** | **+11.8%** |
 
-**NumLoRA wins 12/15 conditions** with an average improvement of +8.3% MAE over vanilla LoRA. Losses are small (-5% to -7%) with overlapping error bars. Traffic and ILI are clean sweeps.
+**NumLoRA wins 12/15 conditions** (+8.3% average MAE improvement). Traffic and ILI are clean sweeps.
 
-**DoRA** (2024 text-PEFT SOTA) performs *worse* than vanilla LoRA on numerical data, confirming that text-optimised PEFT innovations do not transfer.
+### Why CTGS Is the Key
 
-### Ablation: CTGS Is the Key
-
-Component ablation on SmolLM-360M (ETT-h1, Exchange, Weather at MR=0.3):
+Component ablation on SmolLM-360M (MR=0.3, averaged over ETT-h1, Exchange, Weather):
 
 | Variant | vs LoRA | Extra params |
 |---------|---------|-------------|
-| CTGS only | **+8.6%** | 32 |
+| **CTGS only** | **+8.6%** | **32** |
 | MAI only | +7.0% | 0 |
 | SSR only | +5.4% | 27,648 |
 | Full NumLoRA (all 3) | +0.7% | 27,680 |
 
-**CTGS alone outperforms the full three-component method.** Gradient instability, not scale miscalibration, is the dominant failure mode of LoRA on numerical data.
+CTGS alone outperforms the full three-component method. Gradient instability, not scale miscalibration, is the dominant failure mode of LoRA on numerical data.
 
-## Why This Matters
+### DoRA Fails on Numbers
 
-Every existing LoRA variant (LoRA, DoRA, PiSSA, VeRA, QLoRA, AdaLoRA) was designed and evaluated exclusively on text or vision-language tasks. None analysed whether LoRA's gradient flow is appropriate for continuous-valued embeddings. NumLoRA is the first to identify and fix this gap.
+DoRA (2024 text-PEFT SOTA) performs *worse* than vanilla LoRA on numerical benchmarks (e.g., ETT-h1 MR=0.5: DoRA 0.736 vs LoRA 0.692), confirming that text-optimised PEFT innovations do not transfer.
 
 ## Method
 
-For each adapted layer, standard LoRA computes: `h = W₀x + BAx`
+Standard LoRA forward: `h = W₀x + BAx`
 
 CTGS adds one backward-pass modification:
 
@@ -49,38 +47,53 @@ CTGS adds one backward-pass modification:
 ∇_A ← ∇_A · c / (||x|| + ε)
 ```
 
-where `c` is a learnable scalar per layer (init 1.0) and `ε = 1e-8`. This normalises gradient magnitude by the input activation norm, preventing high-magnitude numerical patches from dominating updates. At inference, the hook is inactive and weights merge as standard LoRA.
+where `c` is a learnable scalar per layer (init 1.0) and `ε = 1e-8`. This normalises gradient magnitude by the input activation norm, preventing high-magnitude numerical patches from dominating updates. At inference, the hook is inactive and weights merge as standard LoRA — zero overhead.
 
-## Backbones Tested
+## Supported Tasks
 
-| Backbone | Parameters | Status |
-|----------|-----------|--------|
-| SmolLM-360M | 360M | Full results (12/15 wins) |
-| Qwen2.5-0.5B | 494M | Full results (6/15 wins) |
-| TinyLlama-1.1B | 1.1B | Running |
-| Phi-3-mini | 3.8B | Running |
+NumLoRA supports three downstream tasks out of the box:
+
+| Task | Datasets | Metrics |
+|------|----------|---------|
+| **Imputation** | ETT (h1/h2/m1/m2), Weather, Exchange, Traffic, ILI | MAE, MSE, MRE |
+| **Forecasting** | ETT short/medium/long (horizon 96/192/336) | MAE, MSE, MRE |
+| **Classification** | UCR archive (ECG200, FordA, Wafer, etc.) | Accuracy |
+
+## Backbones
+
+| Backbone | Parameters | Architecture |
+|----------|-----------|-------------|
+| SmolLM-360M | 360M | Llama-family (2024) |
+| Qwen2.5-0.5B | 494M | GQA attention |
+| TinyLlama-1.1B | 1.1B | Llama-family |
+| Phi-3-mini | 3.8B | Phi-family |
 
 ## Quick Start
 
 ```bash
-# Install
-conda activate llms  # or your environment
 pip install -r requirements.txt
 
-# Apply NumLoRA to any HuggingFace model
+# Apply NumLoRA (CTGS) to any HuggingFace model
 from src.models.apply import apply_numlora
 from transformers import AutoModelForCausalLM
 
 model = AutoModelForCausalLM.from_pretrained("HuggingFaceTB/SmolLM-360M")
 replaced = apply_numlora(model, rank=8)  # Auto-detects architecture
-# That's it. Train as usual with standard LoRA training loop.
 ```
 
 ```bash
-# Run experiments
-bash scripts/experiments/launch_smoke.sh      # 5 epochs, ~10 min
-bash scripts/experiments/launch_quick.sh      # 50 epochs, ~2 hours
-bash scripts/experiments/launch_full.sh all   # Full sweep, ~hours
+# Imputation
+python scripts/experiments/train.py --task imputation --dataset ett_h1 --missing-rate 0.3
+
+# Forecasting (short/medium/long term)
+python scripts/experiments/train.py --task forecasting --dataset ett_h1_96
+python scripts/experiments/train.py --task forecasting --dataset ett_h1_336
+
+# Classification
+python scripts/experiments/train.py --task classification --dataset ecg200
+
+# Full clean sweep (all backbones, all tasks)
+bash scripts/experiments/launch_clean_sweep.sh
 ```
 
 ```bash
@@ -94,41 +107,47 @@ python scripts/analysis/generate_tables.py
 NumLoRA/
 ├── src/
 │   ├── models/
-│   │   ├── numlora.py          # Core NumLoRALinear (SSR + CTGS + merge)
-│   │   ├── mai.py              # Magnitude-Aware Initialisation
-│   │   ├── apply.py            # apply_numlora() for any HF model
-│   │   └── imputation_model.py # Frozen-LLM imputation wrapper
+│   │   ├── numlora.py              # Core NumLoRALinear (SSR + CTGS + merge)
+│   │   ├── mai.py                  # Magnitude-Aware Initialisation
+│   │   ├── apply.py                # apply_numlora() for any HF model
+│   │   ├── imputation_model.py     # Frozen-LLM imputation wrapper
+│   │   ├── forecasting_model.py    # Frozen-LLM forecasting wrapper
+│   │   └── classification_model.py # Frozen-LLM classification wrapper
 │   ├── data/
-│   │   └── dataset.py          # TS loaders + MCAR masking
+│   │   ├── dataset.py              # Imputation loaders + MCAR masking
+│   │   ├── forecasting.py          # Forecasting loaders (ETT horizons)
+│   │   └── classification.py       # Classification loaders (UCR)
 │   ├── baselines/
 │   └── utils/
 ├── scripts/
-│   ├── experiments/            # Tier launchers (smoke/quick/full)
-│   │   ├── train.py            # Unified training entry point
-│   │   ├── launch_smoke.sh
-│   │   ├── launch_quick.sh
-│   │   └── launch_full.sh
-│   ├── analysis/
-│   │   └── generate_tables.py  # LaTeX tables + figures from JSON
-│   └── data/
-│       └── download_datasets.sh
-├── configs/                    # Backbone, dataset, baseline configs
-├── tests/                      # 16 unit tests
-├── results/                    # Experiment outputs (JSON per run)
-├── docs/                       # Method spec, ablation plan
-├── EXPERIMENT_STATUS.md        # Live experiment tracker
-└── CHANGELOG.md
+│   ├── experiments/
+│   │   ├── train.py                # Unified entry (--task imputation|forecasting|classification)
+│   │   ├── launch_clean_sweep.sh   # Full production sweep
+│   │   ├── launch_smoke.sh         # Quick validation
+│   │   └── launch_quick.sh         # Intermediate check
+│   └── analysis/
+│       └── generate_tables.py      # LaTeX tables + publication figures
+├── configs/                        # Backbone, dataset, baseline configs
+├── tests/                          # 16 unit tests
+├── docs/
+│   ├── method.md                   # Mathematical specification
+│   ├── ablation-plan.md            # Ablation study design
+│   └── architecture.md             # Figure drawing specifications
+├── EXPERIMENT_STATUS.md            # Live experiment tracker
+├── ROADMAP.md                      # Development roadmap
+└── CHANGELOG.md                    # Version history
 ```
 
 ## Datasets
 
-| Dataset | Domain | Features | Length | Source |
-|---------|--------|----------|--------|--------|
-| ETT-h1 | Electrical load | 7 | 17,420 | [ETDataset](https://github.com/zhouhaoyi/ETDataset) |
-| Weather | Meteorology | 21 | 52,696 | Max Planck Jena |
-| Exchange Rate | Finance | 8 | 7,588 | [Lai et al.](https://github.com/laiguokun/multivariate-time-series-data) |
-| Traffic | Freeway flow | 862 | 17,544 | PeMS |
-| ILI | Epidemiology | 7 | 966 | CDC |
+| Dataset | Domain | Features | Length | Task |
+|---------|--------|----------|--------|------|
+| ETT-h1/h2 | Electrical load | 7 | 17,420 | Imputation + Forecasting |
+| ETT-m1/m2 | Electrical load | 7 | 69,680 | Imputation + Forecasting |
+| Weather | Meteorology | 21 | 52,696 | Imputation |
+| Exchange Rate | Finance | 8 | 7,588 | Imputation |
+| Traffic | Freeway flow | 862 | 17,544 | Imputation |
+| ILI | Epidemiology | 7 | 966 | Imputation |
 
 ## Related Work
 
@@ -139,9 +158,7 @@ This project is part of the LLM-for-Time-Series research programme at YuLab, Hos
 - **Spec2LLM** — Spectral-to-Language Reprogramming for Power Transformer Forecasting (Preprint)
 - **Federated LoRA** — Federated Fine-Tuning of LLMs for Intelligent Automotive Systems (IEEE VTC-Spring 2025)
 
-See also our smart grid co-optimisation framework: [smartgrid-coopt](https://github.com/mesabo/smartgrid-coopt)
-
-For the full list of publications: [Google Scholar](https://scholar.google.com/scholar?q=Franck+Junior+Aboya+Messou)
+See also: [smartgrid-coopt](https://github.com/mesabo/smartgrid-coopt) | [Google Scholar](https://scholar.google.com/scholar?q=Franck+Junior+Aboya+Messou)
 
 ## Citation
 
@@ -157,7 +174,7 @@ For the full list of publications: [Google Scholar](https://scholar.google.com/s
 
 ## Acknowledgments
 
-This work is supported by computational resources provided by [Hosei University](https://www.hosei.ac.jp/) through the Network Intelligence and Security Laboratory (YuLab), Graduate School of Science and Engineering.
+Computational resources provided by [Hosei University](https://www.hosei.ac.jp/) through the Network Intelligence and Security Laboratory (YuLab), Graduate School of Science and Engineering.
 
 ## Contact
 
