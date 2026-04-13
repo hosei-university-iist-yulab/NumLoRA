@@ -1,0 +1,66 @@
+# NumLoRA — Backbone LLM Configurations
+# All backbones are loaded frozen (requires_grad=False on all backbone params)
+
+backbones:
+  gpt2_small:
+    hf_id: "openai-community/gpt2"
+    params: 117M
+    hidden_dim: 768
+    num_layers: 12
+    num_heads: 12
+    context_length: 1024
+    role: primary  # all experiments
+    numlora_params: 175116  # 2*768*8 + 3*768 + 1 per layer, x12 layers
+    lora_params: 147456     # 2*768*8 per layer, x12 layers
+
+  gpt2_medium:
+    hf_id: "openai-community/gpt2-medium"
+    params: 345M
+    hidden_dim: 1024
+    num_layers: 24
+    num_heads: 16
+    context_length: 1024
+    role: scale_check  # 3 datasets only
+    numlora_params: 311064
+    lora_params: 262144
+
+  llama3_8b:
+    hf_id: "meta-llama/Meta-Llama-3-8B"
+    params: 8B
+    hidden_dim: 4096
+    num_layers: 32
+    num_heads: 32
+    context_length: 8192
+    role: large_scale_validation  # 3 datasets, MR=0.3 only
+    access: gated  # requires HuggingFace approval
+    numlora_params: 786464
+    lora_params: 524288
+
+  mistral_7b:
+    hf_id: "mistralai/Mistral-7B-v0.3"
+    params: 7.3B
+    hidden_dim: 4096
+    num_layers: 32
+    num_heads: 32
+    context_length: 32768
+    role: architecture_diversity
+    numlora_params: 786464
+    lora_params: 524288
+
+  qwen2_7b:
+    hf_id: "Qwen/Qwen2-7B"
+    params: 7.7B
+    hidden_dim: 4096
+    num_layers: 32
+    num_heads: 28
+    context_length: 131072
+    role: architecture_diversity
+    numlora_params: 786464
+    lora_params: 524288
+
+# Target modules for LoRA/NumLoRA injection (per backbone family)
+target_modules:
+  gpt2: ["c_attn", "c_proj", "c_fc", "c_proj"]  # Q/K/V combined, attn out, MLP up, MLP down
+  llama: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  mistral: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  qwen2: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]

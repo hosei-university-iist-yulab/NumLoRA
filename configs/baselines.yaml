@@ -1,0 +1,193 @@
+# NumLoRA — Baseline Method Configurations
+
+# ============================================================
+# PEFT baselines (applied to frozen backbone)
+# ============================================================
+
+peft_baselines:
+  frozen:
+    name: "Frozen (zero-shot)"
+    type: "no_adaptation"
+    trainable_params: 0
+    description: "Forward-only through frozen backbone. Lower bound."
+
+  lora_r8:
+    name: "LoRA (r=8)"
+    type: "lora"
+    rank: 8
+    alpha: 16
+    dropout: 0.0
+    library: "peft"
+    reference: "Hu et al. 2022"
+    description: "Standard LoRA. The primary baseline NumLoRA must beat."
+
+  lora_r9:
+    name: "LoRA (r=9)"
+    type: "lora"
+    rank: 9
+    alpha: 18
+    dropout: 0.0
+    library: "peft"
+    description: "Rank-matched fairness check (~166k params vs NumLoRA's ~175k)"
+
+  dora_r8:
+    name: "DoRA (r=8)"
+    type: "dora"
+    rank: 8
+    library: "peft"
+    reference: "Liu et al. 2024 (ICML)"
+    description: "Weight-decomposed LoRA. 2024 SOTA for text PEFT."
+
+  pissa_r8:
+    name: "PiSSA (r=8)"
+    type: "pissa"
+    rank: 8
+    library: "peft or custom"
+    reference: "Meng et al. 2024"
+    description: "SVD-initialised LoRA. Fast convergence."
+
+  vera:
+    name: "VeRA"
+    type: "vera"
+    library: "peft or custom"
+    reference: "Kopiczko et al. 2024"
+    description: "Shared random bases, per-layer scaling. Extreme efficiency."
+
+# ============================================================
+# NumLoRA variants (our method + ablations)
+# ============================================================
+
+numlora:
+  numlora_full:
+    name: "NumLoRA (full)"
+    type: "numlora"
+    rank: 8
+    ssr: true
+    mai: true
+    ctgs: true
+    lr_ab: 1.0e-3
+    lr_aux: 1.0e-2
+    description: "All three modifications: SSR + MAI + CTGS"
+
+  # Ablation variants
+  numlora_mai_only:
+    name: "LoRA + MAI"
+    type: "numlora"
+    rank: 8
+    ssr: false
+    mai: true
+    ctgs: false
+
+  numlora_ssr_only:
+    name: "LoRA + SSR"
+    type: "numlora"
+    rank: 8
+    ssr: true
+    mai: false
+    ctgs: false
+
+  numlora_ctgs_only:
+    name: "LoRA + CTGS"
+    type: "numlora"
+    rank: 8
+    ssr: false
+    mai: false
+    ctgs: true
+
+  numlora_mai_ssr:
+    name: "LoRA + MAI + SSR"
+    type: "numlora"
+    rank: 8
+    ssr: true
+    mai: true
+    ctgs: false
+
+  numlora_mai_ctgs:
+    name: "LoRA + MAI + CTGS"
+    type: "numlora"
+    rank: 8
+    ssr: false
+    mai: true
+    ctgs: true
+
+  numlora_ssr_ctgs:
+    name: "LoRA + SSR + CTGS"
+    type: "numlora"
+    rank: 8
+    ssr: true
+    mai: false
+    ctgs: true
+
+# ============================================================
+# Reprogramming baselines (LLM-for-TS methods)
+# ============================================================
+
+reprogramming_baselines:
+  llm4imp:
+    name: "LLM4Imp"
+    reference: "Messou et al. 2026 (IEEE ICC)"
+    source: "parent paper codebase"
+    description: "Cross-attention reprogramming with spectral prompt. No PEFT inside backbone."
+    config:
+      window_length: 96
+      d_model: 64
+      n_heads: 6
+      epochs: 10
+      optimizer: "AdamW"
+      lr: 1.0e-3
+
+  time_llm:
+    name: "Time-LLM"
+    reference: "Jin et al. 2024"
+    source: "https://github.com/KimMeen/Time-LLM"
+    description: "Prompt-reprogramming frozen LLM for time series."
+
+  gpt4ts:
+    name: "GPT4TS"
+    reference: "Zhou et al. 2023"
+    source: "https://github.com/DAMO-DI-ML/NeurIPS2023-One-Fits-All"
+    description: "Frozen GPT-2 with patching for time-series tasks."
+
+# ============================================================
+# From-scratch imputation baselines
+# ============================================================
+
+imputation_baselines:
+  saits:
+    name: "SAITS"
+    reference: "Du et al. 2023"
+    source: "pypots or https://github.com/WenjieDu/SAITS"
+    description: "Self-attention imputation for time series."
+
+  tslanet:
+    name: "TSLANet"
+    reference: "Eldele et al. 2024"
+    source: "original repo"
+    description: "Time-series lightweight attention network."
+
+  tefn:
+    name: "TEFN"
+    reference: "Wang et al. 2024"
+    source: "original repo"
+    description: "Time-series enhancement fusion network."
+
+  timemixer_pp:
+    name: "TimeMixer++"
+    reference: "Wang et al. 2024"
+    source: "original repo"
+    description: "Multi-resolution time-series mixing."
+
+# ============================================================
+# Shared training config (applied to all methods unless overridden)
+# ============================================================
+
+shared_training:
+  optimizer: "AdamW"
+  lr: 1.0e-3
+  weight_decay: 0.01
+  epochs: 10
+  batch_size: 32
+  early_stopping_patience: 3
+  early_stopping_metric: "val_mae"
+  scheduler: null  # no LR scheduler (match LLM4Imp)
+  gradient_clip: null  # no global clipping (CTGS handles per-sample)

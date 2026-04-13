@@ -1,0 +1,214 @@
+# NumLoRA — Dataset Configurations
+# All datasets are public. Paths are relative to data/ on the server.
+
+# Shared settings
+shared:
+  split_ratio: [0.7, 0.15, 0.15]  # train / val / test — matches LLM4Imp
+  missing_rates: [0.1, 0.2, 0.3, 0.4, 0.5]
+  masking_type: MCAR
+  seeds: [42, 123, 456]
+  window_length: 96  # matches LLM4Imp
+  patch_size: 16     # matches LLM4Imp
+
+# ============================================================
+# 10 Time-Series Datasets (primary)
+# ============================================================
+
+time_series:
+  physionet2012:
+    name: "PhysioNet 2012 Challenge"
+    domain: "ICU vitals"
+    source: "https://physionet.org/content/challenge-2012/1.0.0/"
+    T: 48
+    D: 35
+    size_mb: 200
+    license: "ODC-BY"
+    data_dir: "data/ts/physionet2012/"
+    notes: "Clinical heterogeneity; used in LLM4Imp; baseline target"
+    bursty_masking: true  # also test sensor-offline scenario
+
+  beijing_aq:
+    name: "Beijing Air Quality"
+    domain: "Air pollution"
+    source: "https://archive.ics.uci.edu/dataset/501"
+    T: variable
+    D: 6
+    size_mb: 40
+    license: "UCI (public)"
+    data_dir: "data/ts/beijing_aq/"
+    notes: "Smooth periodic structure; LLM4Imp's best win"
+
+  italy_aq:
+    name: "Italy Air Quality"
+    domain: "Air pollution"
+    source: "https://archive.ics.uci.edu/dataset/360"
+    T: 9357
+    D: 13
+    size_mb: 30
+    license: "UCI (public)"
+    data_dir: "data/ts/italy_aq/"
+    notes: "Noisy, short; tests robustness"
+
+  solar_alabama:
+    name: "Solar Alabama"
+    domain: "Solar generation"
+    source: "https://www.nrel.gov/grid/solar-power-data.html"
+    T: variable
+    D: 137
+    size_mb: 170
+    license: "NREL (public)"
+    data_dir: "data/ts/solar_alabama/"
+    notes: "LLM4Imp failure mode at MR>=0.3; high dynamic range 0–1400 W/m^2"
+    bursty_masking: true
+
+  ett_h1:
+    name: "ETTh1"
+    domain: "Electrical load"
+    source: "https://github.com/zhouhaoyi/ETDataset"
+    T: 17420
+    D: 7
+    size_mb: 10
+    license: "Public"
+    data_dir: "data/ts/ett/h1/"
+
+  ett_h2:
+    name: "ETTh2"
+    domain: "Electrical load"
+    source: "https://github.com/zhouhaoyi/ETDataset"
+    T: 17420
+    D: 7
+    size_mb: 10
+    license: "Public"
+    data_dir: "data/ts/ett/h2/"
+
+  ett_m1:
+    name: "ETTm1"
+    domain: "Electrical load"
+    source: "https://github.com/zhouhaoyi/ETDataset"
+    T: 69680
+    D: 7
+    size_mb: 10
+    license: "Public"
+    data_dir: "data/ts/ett/m1/"
+
+  ett_m2:
+    name: "ETTm2"
+    domain: "Electrical load"
+    source: "https://github.com/zhouhaoyi/ETDataset"
+    T: 69680
+    D: 7
+    size_mb: 10
+    license: "Public"
+    data_dir: "data/ts/ett/m2/"
+
+  electricity:
+    name: "Electricity (UCI LoadDiagrams)"
+    domain: "Load diagrams"
+    source: "https://archive.ics.uci.edu/dataset/321"
+    T: 26304
+    D: 321
+    size_mb: 250
+    license: "UCI"
+    data_dir: "data/ts/electricity/"
+    notes: "High-dim (321 variables)"
+
+  traffic:
+    name: "Traffic (PeMS)"
+    domain: "Freeway flow"
+    source: "https://github.com/laiguokun/multivariate-time-series-data"
+    T: 17544
+    D: 862
+    size_mb: 130
+    license: "PeMS (public)"
+    data_dir: "data/ts/traffic/"
+    notes: "Very high-dim (862); strong daily+weekly seasonality"
+
+  weather:
+    name: "Weather (Max Planck Jena)"
+    domain: "Meteorology"
+    source: "https://www.kaggle.com/datasets/stytch16/jena-climate-2009-2016"
+    T: 52696
+    D: 21
+    size_mb: 30
+    license: "CC-BY"
+    data_dir: "data/ts/weather/"
+    notes: "10-min resolution; strong daily cycle"
+
+  exchange_rate:
+    name: "Exchange Rate"
+    domain: "Finance"
+    source: "https://github.com/laiguokun/multivariate-time-series-data"
+    T: 7588
+    D: 8
+    size_mb: 1
+    license: "Public"
+    data_dir: "data/ts/exchange/"
+    notes: "Non-stationary, near-random-walk, no strong periodicity — adversarial"
+
+  ili:
+    name: "ILI (CDC Influenza-like Illness)"
+    domain: "Epidemiology"
+    source: "https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html"
+    T: 966
+    D: 7
+    size_mb: 1
+    license: "CDC public"
+    data_dir: "data/ts/ili/"
+    notes: "Tiny dataset; strong yearly seasonality"
+
+# ============================================================
+# 5 Non-Time-Series Datasets (generalisation)
+# ============================================================
+
+non_time_series:
+  uci_regression:
+    name: "UCI Regression Suite"
+    modality: "Tabular regression"
+    sub_datasets: ["boston", "energy", "yacht", "kin8nm", "power", "protein", "wine", "naval"]
+    source: "https://archive.ics.uci.edu"
+    size_mb: 100
+    license: "UCI (public)"
+    data_dir: "data/non_ts/uci_regression/"
+    tokenisation: "each feature = 1 patch"
+    notes: "Standard DL regression benchmark"
+
+  openml_cc18:
+    name: "OpenML-CC18"
+    modality: "Tabular classification"
+    num_tasks: 72
+    source: "https://www.openml.org/s/99"
+    size_mb: 5000
+    license: "CC-BY"
+    data_dir: "data/non_ts/openml_cc18/"
+    tokenisation: "each feature = 1 patch"
+    notes: "Tabular-DL's MMLU equivalent"
+
+  qm9:
+    name: "QM9"
+    modality: "Molecular"
+    source: "https://moleculenet.org/datasets-1"
+    size_mb: 400
+    license: "CC-BY"
+    data_dir: "data/non_ts/qm9/"
+    tokenisation: "SMILES via backbone BPE"
+    notes: "Predict 12 quantum-chemical properties"
+
+  pdebench:
+    name: "PDEBench (Burgers 1D + Darcy 2D)"
+    modality: "PDE trajectories"
+    source: "https://github.com/pdebench/PDEBench"
+    size_mb: 2000
+    license: "MIT"
+    data_dir: "data/non_ts/pdebench/"
+    tokenisation: "spatial grid as T, solution channels as D"
+    notes: "Continuous spatial data"
+
+  higgs:
+    name: "Higgs (100k subset)"
+    modality: "Particle physics tabular"
+    source: "https://archive.ics.uci.edu/dataset/280"
+    size_mb: 50
+    license: "Public"
+    data_dir: "data/non_ts/higgs/"
+    tokenisation: "each feature = 1 patch"
+    notes: "28 features, 100k rows; binary classification"
