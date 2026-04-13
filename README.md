@@ -168,7 +168,7 @@ See also: [smartgrid-coopt](https://github.com/mesabo/smartgrid-coopt) | [Google
   author={Messou, Franck Junior Aboya and Liu, Tong and Wang, Weiyu
           and Chen, Jinhua and Zhang, Shilong and Yu, Tao and Yu, Keping},
   year={2026},
-  note={Manuscript in preparation}
+  note={In preparation for NeurIPS 2026}
 }
 ```
 
