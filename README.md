@@ -158,7 +158,7 @@ This project is part of the LLM-for-Time-Series research programme at YuLab, Hos
 - **Spec2LLM** — Spectral-to-Language Reprogramming for Power Transformer Forecasting (Preprint)
 - **Federated LoRA** — Federated Fine-Tuning of LLMs for Intelligent Automotive Systems (IEEE VTC-Spring 2025)
 
-See also: [smartgrid-coopt](https://github.com/mesabo/smartgrid-coopt) | [Google Scholar](https://scholar.google.com/scholar?q=Franck+Junior+Aboya+Messou)
+See also: [smartgrid-coopt](https://github.com/mesabo/smartgrid-coopt) | [Mesabo GitHub](https://github.com/mesabo) | [Google Scholar](https://scholar.google.com/scholar?q=Franck+Junior+Aboya+Messou)
 
 ## Citation
 
@@ -178,7 +178,7 @@ Computational resources provided by [Hosei University](https://www.hosei.ac.jp/)
 
 ## Contact
 
-**Franck Junior Aboya Messou** — franckjunioraboya.messou@ieee.org
+**Franck Junior Aboya Messou** ([@mesabo](https://github.com/mesabo)) — franckjunioraboya.messou@ieee.org
 
 ## License
 
