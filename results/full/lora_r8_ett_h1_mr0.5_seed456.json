@@ -1,0 +1,16 @@
+{
+  "method": "lora_r8",
+  "dataset": "ett_h1",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.5,
+  "seed": 456,
+  "epochs_trained": 29,
+  "elapsed_seconds": 482.5,
+  "test_mae": 0.66275,
+  "test_mse": 0.72943,
+  "test_rmse": 0.854067,
+  "best_val_mae": 0.77126,
+  "trainable_params": 1854512,
+  "trainable_pct": 0.51,
+  "tier": "full"
+}

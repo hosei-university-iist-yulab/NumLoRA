@@ -1,0 +1,16 @@
+{
+  "method": "numlora_mai_ctgs",
+  "dataset": "weather",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.3,
+  "seed": 42,
+  "epochs_trained": 32,
+  "elapsed_seconds": 695.2,
+  "test_mae": 0.188583,
+  "test_mse": 0.113558,
+  "test_rmse": 0.336984,
+  "best_val_mae": 0.240102,
+  "trainable_params": 4988400,
+  "trainable_pct": 1.36,
+  "tier": "full"
+}

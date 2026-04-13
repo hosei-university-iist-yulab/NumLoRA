@@ -1,0 +1,16 @@
+{
+  "method": "numlora_ssr_ctgs",
+  "dataset": "ett_h1",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.5,
+  "seed": 456,
+  "epochs_trained": 20,
+  "elapsed_seconds": 317.9,
+  "test_mae": 0.602034,
+  "test_mse": 0.60994,
+  "test_rmse": 0.780987,
+  "best_val_mae": 0.592635,
+  "trainable_params": 5377296,
+  "trainable_pct": 1.46,
+  "tier": "full"
+}

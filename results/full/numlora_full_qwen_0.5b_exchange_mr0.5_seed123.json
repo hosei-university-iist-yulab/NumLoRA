@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "exchange",
+  "backbone": "qwen_0.5b",
+  "missing_rate": 0.5,
+  "seed": 123,
+  "epochs_trained": 31,
+  "elapsed_seconds": 306.2,
+  "test_mae": 1.265305,
+  "test_mse": 2.279428,
+  "test_rmse": 1.509777,
+  "best_val_mae": 1.331798,
+  "trainable_params": 5483688,
+  "trainable_pct": 1.1,
+  "tier": "full"
+}

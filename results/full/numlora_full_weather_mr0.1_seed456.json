@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "weather",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.1,
+  "seed": 456,
+  "epochs_trained": 35,
+  "elapsed_seconds": 970.4,
+  "test_mae": 0.209096,
+  "test_mse": 0.136804,
+  "test_rmse": 0.36987,
+  "best_val_mae": 0.286499,
+  "trainable_params": 5807600,
+  "trainable_pct": 1.58,
+  "tier": "full"
+}

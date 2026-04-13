@@ -1,0 +1,16 @@
+{
+  "method": "numlora_ctgs_only",
+  "dataset": "ili",
+  "backbone": "tinyllama_1.1b",
+  "missing_rate": 0.5,
+  "seed": 42,
+  "epochs_trained": 20,
+  "elapsed_seconds": 163.8,
+  "test_mae": 1.691503,
+  "test_mse": 5.682146,
+  "test_rmse": 2.383725,
+  "best_val_mae": 0.737547,
+  "trainable_params": 6539474,
+  "trainable_pct": 0.59,
+  "tier": "full"
+}

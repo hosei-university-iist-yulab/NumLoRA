@@ -1,0 +1,16 @@
+{
+  "method": "numlora_mai_only",
+  "dataset": "ett_h1",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.5,
+  "seed": 123,
+  "epochs_trained": 29,
+  "elapsed_seconds": 266.2,
+  "test_mae": 0.59292,
+  "test_mse": 0.604652,
+  "test_rmse": 0.777594,
+  "best_val_mae": 0.618291,
+  "trainable_params": 4557872,
+  "trainable_pct": 1.24,
+  "tier": "full"
+}

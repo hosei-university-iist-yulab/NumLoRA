@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "traffic",
+  "backbone": "qwen_0.5b",
+  "missing_rate": 0.1,
+  "seed": 42,
+  "epochs_trained": 49,
+  "elapsed_seconds": 612.3,
+  "test_mae": 0.599614,
+  "test_mse": 0.883492,
+  "test_rmse": 0.939943,
+  "best_val_mae": 0.474989,
+  "trainable_params": 5827944,
+  "trainable_pct": 1.17,
+  "tier": "full"
+}

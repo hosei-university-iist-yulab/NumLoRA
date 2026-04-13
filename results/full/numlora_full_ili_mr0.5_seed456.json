@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "ili",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.5,
+  "seed": 456,
+  "epochs_trained": 82,
+  "elapsed_seconds": 923.0,
+  "test_mae": 1.363988,
+  "test_mse": 4.219468,
+  "test_rmse": 2.054134,
+  "best_val_mae": 0.466881,
+  "trainable_params": 5269720,
+  "trainable_pct": 1.44,
+  "tier": "full"
+}

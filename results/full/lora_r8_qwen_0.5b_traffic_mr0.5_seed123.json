@@ -1,0 +1,16 @@
+{
+  "method": "lora_r8",
+  "dataset": "traffic",
+  "backbone": "qwen_0.5b",
+  "missing_rate": 0.5,
+  "seed": 123,
+  "epochs_trained": 19,
+  "elapsed_seconds": 341.3,
+  "test_mae": 0.553041,
+  "test_mse": 0.779035,
+  "test_rmse": 0.88263,
+  "best_val_mae": 0.389273,
+  "trainable_params": 1656000,
+  "trainable_pct": 0.33,
+  "tier": "full"
+}

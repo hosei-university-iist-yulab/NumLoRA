@@ -1,0 +1,16 @@
+{
+  "method": "lora_r8",
+  "dataset": "ili",
+  "backbone": "qwen_0.5b",
+  "missing_rate": 0.1,
+  "seed": 456,
+  "epochs_trained": 77,
+  "elapsed_seconds": 801.2,
+  "test_mae": 2.040302,
+  "test_mse": 7.827585,
+  "test_rmse": 2.797782,
+  "best_val_mae": 1.292794,
+  "trainable_params": 1182648,
+  "trainable_pct": 0.24,
+  "tier": "full"
+}

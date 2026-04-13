@@ -1,0 +1,16 @@
+{
+  "method": "numlora_ctgs_only",
+  "dataset": "traffic",
+  "backbone": "tinyllama_1.1b",
+  "missing_rate": 0.3,
+  "seed": 456,
+  "epochs_trained": 21,
+  "elapsed_seconds": 238.4,
+  "test_mae": 0.984067,
+  "test_mse": 1.853181,
+  "test_rmse": 1.361316,
+  "best_val_mae": 0.601596,
+  "trainable_params": 7621082,
+  "trainable_pct": 0.69,
+  "tier": "full"
+}

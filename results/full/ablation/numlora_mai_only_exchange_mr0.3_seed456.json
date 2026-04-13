@@ -1,0 +1,16 @@
+{
+  "method": "numlora_mai_only",
+  "dataset": "exchange",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.3,
+  "seed": 456,
+  "epochs_trained": 48,
+  "elapsed_seconds": 446.0,
+  "test_mae": 1.448745,
+  "test_mse": 2.845413,
+  "test_rmse": 1.686835,
+  "best_val_mae": 1.258818,
+  "trainable_params": 4588608,
+  "trainable_pct": 1.25,
+  "tier": "full"
+}

@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "traffic",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.5,
+  "seed": 123,
+  "epochs_trained": 19,
+  "elapsed_seconds": 455.6,
+  "test_mae": 0.55386,
+  "test_mse": 0.869174,
+  "test_rmse": 0.932295,
+  "best_val_mae": 0.385345,
+  "trainable_params": 5776864,
+  "trainable_pct": 1.57,
+  "tier": "full"
+}

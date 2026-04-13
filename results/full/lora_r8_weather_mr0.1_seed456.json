@@ -1,0 +1,16 @@
+{
+  "method": "lora_r8",
+  "dataset": "weather",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.1,
+  "seed": 456,
+  "epochs_trained": 25,
+  "elapsed_seconds": 721.0,
+  "test_mae": 0.213177,
+  "test_mse": 0.135607,
+  "test_rmse": 0.368249,
+  "best_val_mae": 0.296125,
+  "trainable_params": 2284816,
+  "trainable_pct": 0.63,
+  "tier": "full"
+}

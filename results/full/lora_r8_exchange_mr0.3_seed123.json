@@ -1,0 +1,16 @@
+{
+  "method": "lora_r8",
+  "dataset": "exchange",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.3,
+  "seed": 123,
+  "epochs_trained": 39,
+  "elapsed_seconds": 418.1,
+  "test_mae": 1.37608,
+  "test_mse": 2.834178,
+  "test_rmse": 1.683502,
+  "best_val_mae": 1.376565,
+  "trainable_params": 1885248,
+  "trainable_pct": 0.52,
+  "tier": "full"
+}

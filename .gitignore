@@ -43,8 +43,7 @@ checkpoints/
 *.log
 wandb/
 
-# Results (regenerable)
-results/
+# Results
 outputs/
 
 # OS

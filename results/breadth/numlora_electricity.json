@@ -1,0 +1,16 @@
+{
+  "method": "numlora_full",
+  "dataset": "electricity",
+  "backbone": "smollm_360m",
+  "missing_rate": 0.3,
+  "seed": 42,
+  "epochs_trained": 1,
+  "elapsed_seconds": 216.5,
+  "test_mae": 950004185.6,
+  "test_mse": 1.208120781636318e+19,
+  "test_rmse": 3475803190.107746,
+  "best_val_mae": 712515515.6,
+  "trainable_params": 5776864,
+  "trainable_pct": 1.57,
+  "tier": "full"
+}

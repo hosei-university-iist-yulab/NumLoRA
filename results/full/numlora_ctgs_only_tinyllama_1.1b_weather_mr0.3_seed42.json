@@ -1,0 +1,16 @@
+{
+  "method": "numlora_ctgs_only",
+  "dataset": "weather",
+  "backbone": "tinyllama_1.1b",
+  "missing_rate": 0.3,
+  "seed": 42,
+  "epochs_trained": 86,
+  "elapsed_seconds": 685.8,
+  "test_mae": 0.241151,
+  "test_mse": 0.180151,
+  "test_rmse": 0.424442,
+  "best_val_mae": 0.294333,
+  "trainable_params": 7686634,
+  "trainable_pct": 0.69,
+  "tier": "full"
+}
