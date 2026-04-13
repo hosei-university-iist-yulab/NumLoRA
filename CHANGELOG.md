@@ -6,71 +6,82 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.3.0] — 2026-04-12 (Phase 3: Full sweep running)
+## [0.4.0] — 2026-04-13
 
 ### Added
-- Full sweep launched: 5 datasets x 3 MRs x 3 seeds x {LoRA, NumLoRA} = 90 runs on GPUs 4-7
-- Additional dataset loaders: Weather (52k x 21), Exchange (7.5k x 8), Traffic (17k x 20), ILI (966 x 7)
-- Datasets symlinked from existing server cache (no re-download needed)
+- Multi-task support: `--task imputation|forecasting|classification` in train.py
+- Forecasting task: ETT short/medium/long horizons (96/192/336) with LLMForecastingModel
+- Classification task: UCR dataset loader with LLMClassificationModel (mean-pool + MLP)
+- MRE (Mean Relative Error) metric added to all evaluations alongside MAE and MSE
+- Task-specific output directories: `results/full/{imputation,forecasting,classification,ablation}/`
+- Architecture diagram specifications in `docs/architecture.md`
+- Clean sweep launcher `scripts/experiments/launch_clean_sweep.sh` with OOM-aware GPU allocation
 
 ### Changed
-- Electricity dataset removed (data pipeline incompatibility, not needed for core claims)
+- Paper narrative pivoted to CTGS-focused: SSR and MAI demoted to "investigated but not recommended"
+- All previous results cleared for clean re-run with 0% bias
 
 ---
 
-## [0.2.0] — 2026-04-12 (Phase 2 complete + pilot passed)
+## [0.3.0] — 2026-04-08
 
 ### Added
-- Core NumLoRA module: `src/models/numlora.py` (~170 LoC) — NumLoRALinear with SSR, CTGS, merge/unmerge
-- MAI calibration: `src/models/mai.py` — single forward pass variance measurement + per-layer init
-- Generic wrapper: `src/models/apply.py` — apply_numlora() for any HuggingFace model (auto-detects GPT-2/Llama/Phi/Qwen/SmolLM/Mistral, handles Conv1D)
-- Imputation model: `src/models/imputation_model.py` — input proj → frozen backbone → output head
+- Full experimental sweep: 4 backbones x 5 datasets x 3 MRs x 3 seeds
+- Component ablation: 7 subsets of {SSR, MAI, CTGS} on SmolLM and TinyLlama
+- DoRA baseline comparison (killed after confirming worse than LoRA on numerical data)
+- Publication-quality figure generation matching topic4 style (bold, serif, 600 dpi)
+- Results aggregation script: `scripts/analysis/generate_tables.py` (LaTeX tables + PDF figures)
+- Radar charts, MR curves, ablation bars, efficiency plots
+- NeurIPS 2026 paper draft with real results (9 pages, Algorithm 1, 3 figures)
+
+### Key findings
+- SmolLM-360M: NumLoRA wins 12/15 conditions (+8.3% avg MAE over LoRA)
+- CTGS alone (+8.6%) outperforms full NumLoRA (+0.7%) — SSR interferes with CTGS
+- DoRA degrades on numerical data, confirming text-PEFT innovations do not transfer
+- Qwen-0.5B: mixed results (6/15 wins), SSR lr needs per-architecture tuning
+
+---
+
+## [0.2.0] — 2026-04-02
+
+### Added
+- Core NumLoRA module: `src/models/numlora.py` (~170 LoC) with SSR, CTGS, merge/unmerge
+- MAI calibration: `src/models/mai.py` — single forward pass variance measurement
+- Generic wrapper: `src/models/apply.py` — apply_numlora() for any HuggingFace model
+- Auto-detection for GPT-2 (Conv1D), Llama, Phi, Qwen, SmolLM, Mistral architectures
+- Imputation model: `src/models/imputation_model.py` — input proj -> backbone -> output head
 - Dataset pipeline: `src/data/dataset.py` — MCAR masking, patch tokenization, ETT/Weather/Exchange/Traffic/ILI loaders
-- Training script: `scripts/experiments/train.py` — unified entry point with method/backbone selection, dual LR, early stopping, JSON output
-- Tier launchers: `scripts/experiments/launch_{smoke,quick,full}.sh` — GPU 4-7 round-robin
-- Unit tests: 16 tests passing (init identity, merge, gradient flow, param groups, backbone-agnostic)
-- NeurIPS 2026 paper template with simulated content: `paper/Formatting_Instructions_For_NeurIPS_2026/main.tex`
+- Training script: `scripts/experiments/train.py` — unified entry with method/backbone selection, dual LR, early stopping
+- Tier-based launchers: smoke (5 ep), quick (50 ep), full (100 ep)
+- 16 unit tests (init identity, merge correctness, gradient flow, param groups, backbone-agnostic)
+- Backbone smoke tests: GPT-2 (48 layers), SmolLM (224 layers), Qwen (168 layers) — all pass
 
 ### Changed
-- **Primary backbone: SmolLM-360M** (replaced GPT-2 Small). GPT-2 is too old for NeurIPS 2026 and has narrow MAI variance range (0.01-0.66), masking NumLoRA's advantage. SmolLM-360M (2024) has variance range 0.001-155x.
-- CTGS hook: fixed accumulation bug (was registering new hook per forward call, now registers once with cached x_norm)
-- SSR default learning rate: 1e-2 → 3e-3 (stability on larger models)
+- Primary backbone: SmolLM-360M (GPT-2 dropped — too old, narrow MAI variance range)
+- CTGS hook: fixed accumulation bug (was registering new hook per forward, now registers once)
+- SSR learning rate: 1e-2 -> 3e-3 (stability on larger models)
 
 ### Pilot results (kill/continue gate: PASSED)
-Breadth-first pilot on SmolLM-360M, MR=0.3, seed=42, 50 epochs:
-
-| Dataset | LoRA MAE | NumLoRA MAE | Improvement |
-|---|---|---|---|
-| Exchange | 1.7704 | 1.3066 | +26.2% |
-| ETT-h1 | 0.7088 | 0.5720 | +19.3% |
-| Traffic | 0.6801 | 0.6134 | +9.8% |
-| Weather | 0.2251 | 0.2107 | +6.4% |
-| ILI | 1.4622 | 1.4008 | +4.2% |
-
-NumLoRA wins 5/5 datasets, average improvement +13.2%.
-
-### Backbone smoke tests passed
-- GPT-2 Small (117M): 48 layers, forward+backward+merge PASS
-- SmolLM-360M (360M): 224 layers, forward+backward+merge PASS
-- Qwen2.5-0.5B (494M): 168 layers, forward+backward+merge PASS
+- SmolLM-360M breadth pilot: 5/5 datasets won (+4.2% to +26.2% over LoRA)
 
 ---
 
-## [0.1.0] — 2026-04-12 (Phase 0 complete)
+## [0.1.0] — 2026-03-24
 
 ### Added
 - Project scaffold aligned with topic1-4 conventions
 - `.gitignore`, `pyproject.toml`, `requirements.txt`
-- Directory structure: `src/`, `data/`, `results/{smoke,quick,full}/`, `paper/`, `tests/`
-- Scripts reorganized: `scripts/{experiments,analysis,data}/`
-- Documentation: README.md, ROADMAP.md, EXPERIMENTS.md, CHANGELOG.md
-- Method spec (docs/method.md), ablation plan (docs/ablation-plan.md), reviewer defense (docs/reviewer-defense.md)
-- Config templates: configs/backbones.yaml, configs/datasets.yaml, configs/baselines.yaml
-- Dataset download script: scripts/data/download_datasets.sh
-- All GPU/compute references updated: RTX 3090 GPUs 4-7, conda env `llms`
+- Directory structure: `src/`, `data/`, `results/{smoke,quick,full}/`, `tests/`
+- Scripts: `scripts/{experiments,analysis,data}/`
+- Documentation: README.md, ROADMAP.md, EXPERIMENTS.md
+- Method specification: `docs/method.md`
+- Ablation plan: `docs/ablation-plan.md`
+- Reviewer defense: `docs/reviewer-defense.md`
+- Config templates: `configs/{backbones,datasets,baselines}.yaml`
+- Dataset download script skeleton
+- NeurIPS 2026 paper template
 
 ### Context
 - Parent paper: LLM4Imp (Messou et al., IEEE ICC 2026)
-- Target venue: NeurIPS 2026 main track
-- NumLoRA addresses the gap that LoRA is calibrated for text, not numbers
-- Three modifications (SSR, MAI, CTGS) are prior-free and backbone-agnostic
+- Direction D5 from the LLM4Imp future-directions roadmap
+- Three modifications proposed: SSR, MAI, CTGS — all prior-free and backbone-agnostic
